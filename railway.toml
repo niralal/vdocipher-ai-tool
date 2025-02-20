@@ -4,5 +4,4 @@ buildCommand = "pip install -r requirements.txt"
 
 [deploy]
 startCommand = "python main.py"
-healthcheckPath = "/"
-restartPolicyType = "on-failure" 
+healthcheckPath = "/" 
