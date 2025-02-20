@@ -78,3 +78,13 @@ OUTPUT_DIR = "tmp"
 Generated subtitle files are saved in the `tmp/` directory in SRT format:
 - Original subtitles: `[video_id].srt`
 - Translated subtitles: `[video_id]_[language_code].srt`
+
+
+## Run the project with Railway
+
+1. Create a Railway project
+2. Add environment variables to the project
+3. Run the project
+
+# Run in background with logging
+railway run "python main.py > output.log 2>&1 &"
