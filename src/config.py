@@ -3,10 +3,7 @@ Configuration settings for the subtitle generation system.
 Uses environment variables for deployment.
 """
 import os
-from dotenv import load_dotenv
 
-# Load environment variables from .env file if it exists
-load_dotenv()
 
 class Config:
     # Video ID or CSV file path for processing
