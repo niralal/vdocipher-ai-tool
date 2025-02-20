@@ -36,4 +36,7 @@ ENV/
 
 # Temporary files
 tmp/
-*.srt 
+*.srt
+
+# Environment variables
+.env 
