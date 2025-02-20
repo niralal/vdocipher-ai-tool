@@ -3,5 +3,5 @@ builder = "nixpacks"
 buildCommand = "pip install -r requirements.txt"
 
 [deploy]
-startCommand = "python main.py"
-healthcheckPath = "/" 
+startCommand = "echo 'Environment ready. Use railway run to execute commands.'"
+healthcheckPath = "/health" 
