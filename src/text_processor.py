@@ -9,11 +9,15 @@ import time
 from openai import OpenAI
 
 class TextProcessor:
-    def __init__(self, openai_api_key):
-        """Initialize with OpenAI API key"""
+    def __init__(self, openai_api_key, config=None):
+        """Initialize with OpenAI API key and optional config"""
         self.openai_client = OpenAI(api_key=openai_api_key)
+        self.config = config
         self.MAX_RETRIES = 3
-        self.RETRY_DELAY = 5  # seconds
+        self.RETRY_DELAY = 5
+        # Get models from config or use defaults
+        self.grammar_model = self.config.GRAMMAR_MODEL if self.config else "gpt-3.5-turbo"
+        self.translation_model = self.config.TRANSLATION_MODEL if self.config else "gpt-3.5-turbo"
 
     def correct_grammar(self, text):
         """
@@ -23,29 +27,59 @@ class TextProcessor:
         retries = 0
         while retries < self.MAX_RETRIES:
             try:
-                print(f"Starting grammar correction with GPT-3.5 (attempt {retries + 1}/{self.MAX_RETRIES})...")
+                print(f"Starting grammar correction with {self.grammar_model} (attempt {retries + 1}/{self.MAX_RETRIES})...")
                 response = self.openai_client.chat.completions.create(
-                    model="gpt-3.5-turbo",
+                    model=self.grammar_model,
                     messages=[
                         {
                             "role": "system", 
-                            "content": """אתה עורך כתוביות המתמחה בתיקון טקסט מדעי וטכני בעברית.
+                            "content": """אתה עורך כתוביות המתמחה בתיקון טקסט מדעי וטכני בעברית, עבור קורסי למידה לסטודנטים.
 
-כללים חשובים:
-1. תקן מונחים טכניים ומדעיים שגויים שנובעים מטעויות הקלטה, לדוגמה:
-   - "צד חשמלי" → "שדה חשמלי"
-   
-2. תקן שגיאות דקדוק ואיות ברורות:
-   - "צרייך" → "צריך"
-   - "אנחנו רוצה" → "אנחנו רוצים"
+חשוב מאוד: יש לתקן אך ורק את הטעויות בהתאם להנחיות שלהלן.  
+מטרת העריכה היא להבטיח דיוק מדעי, טכני ולשוני, תוך התאמה לתוכן שנאמר.  
+יש לשמור על נאמנות מלאה למקור ולמונחים מקצועיים, אך ניתן לבצע התאמות לשיפור הבהירות במקרים נחוצים.  
 
-3. אם אין טעויות לתיקון, החזר את הטקסט המקורי בדיוק כפי שהוא
+חשוב ביותר: 
+1. אין לשנות בשום אופן את מספרי השורות או את חותמות הזמן (timestamps).
+2. חובה להחליף את המילה "חול" ל-"חו״ל" בכל מקום שמדובר על חוץ לארץ, במיוחד כשמדובר על:
+   - ייצוא לחול → ייצוא לחו״ל
+   - מחיר בחול → מחיר בחו״ל
+   - שוק חול → שוק חו״ל
 
-4. אל תשנה:
-   - מונחים טכניים נכונים
-   - מבנה משפטים תקין
-   - סגנון דיבור
-   - קודי זמן ומבנה שורות"""
+---
+
+1. תיקון מונחים מדעיים, טכניים וכלכליים:  
+   - יש לוודא שימוש נכון במונחים מקצועיים בהתאם לתחום התוכן.  
+   - מונחים כלכליים:  
+     - "הצעה" → "היצע" (רק כאשר מדובר במשמעות הכלכלית של היצע וביקוש).  
+     - "ההצעה נותרת" → "ההיצע נותר".  
+     - "הצעת שוק" → "היצע שוק".  
+     - "ביקוש" ו-"היצע" הם בזכר: "הביקוש גדל", "ההיצע יורד" (ולא "גדלה"/"יורדת").  
+
+   - מונחים מדעיים וטכניים:  
+     - יש לוודא שהמינוח המדעי מדויק ונכון בהתאם לתחום (פיזיקה, מתמטיקה, מדעי המחשב וכו').  
+     - במקרה של שימוש לא נכון במונח מדעי – יש לתקן בהתאם למונח הנכון.  
+     - יש לוודא אחידות בכתיבת מונחים לאורך כל הטקסט.  
+
+2. תיקון קיצורים ושמות מוסדות:  
+   - כתיבה תקנית של קיצורים נפוצים:  
+     - "חול" → "חו״ל" (חובה להחליף בכל מקום שמדובר על חוץ לארץ).  
+     - "צהל" → "צה״ל".  
+     - "ארהב" → "ארה״ב".  
+     - "אום" → "או״ם".  
+
+3. שמירה על סגנון הדיבור של המרצה והתאמה לתוכן:
+   - יש להימנע משינוי סגנון הדיבור של המרצה גם אם הוא יומיומי או לא רשמי.  
+   - ניתן לבצע תיקונים קלים לשיפור בהירות המשפטים, אך רק כאשר ברור שהטקסט אינו משקף נכון את הנאמר.  
+   - יש להימנע משינוי ניסוח אם המשמעות נשארת זהה.  
+
+4. מה לא לשנות:
+   - אל תשנה ביטויים יומיומיים, גם אם הם אינם תקניים.  
+   - אל תשנה מילים שאינן מונחים מקצועיים.  
+   - אל תשנה מבנה של שורות או קודי זמן בכתוביות.  
+   - אל תשנה התאמות דקדוקיות במילים שלא הוגדרו במפורש לעיל.  
+
+אם אין טעויות מסוגים אלו – החזר את הטקסט המקורי בדיוק כפי שהוא."""
                         },
                         {"role": "user", "content": text}
                     ],
@@ -53,14 +87,7 @@ class TextProcessor:
                     timeout=30
                 )
                 
-                corrected_text = response.choices[0].message.content
-                
-                # If we got the confirmation message, return original text
-                if "הכתוביות נכתבו באופן תקין" in corrected_text:
-                    print("No corrections needed, keeping original text")
-                    return text
-                
-                return corrected_text
+                return response.choices[0].message.content
                 
             except Exception as e:
                 retries += 1
@@ -80,9 +107,9 @@ class TextProcessor:
         retries = 0
         while retries < self.MAX_RETRIES:
             try:
-                print(f"Starting Arabic translation with GPT-3.5 (attempt {retries + 1}/{self.MAX_RETRIES})...")
+                print(f"Starting Arabic translation with {self.translation_model} (attempt {retries + 1}/{self.MAX_RETRIES})...")
                 response = self.openai_client.chat.completions.create(
-                    model="gpt-3.5-turbo",
+                    model=self.translation_model,
                     messages=[
                         {
                             "role": "system", 
@@ -135,9 +162,9 @@ Example Output:
         retries = 0
         while retries < self.MAX_RETRIES:
             try:
-                print(f"Starting Russian translation with GPT-3.5 (attempt {retries + 1}/{self.MAX_RETRIES})...")
+                print(f"Starting Russian translation with {self.translation_model} (attempt {retries + 1}/{self.MAX_RETRIES})...")
                 response = self.openai_client.chat.completions.create(
-                    model="gpt-3.5-turbo",
+                    model=self.translation_model,
                     messages=[
                         {
                             "role": "system", 
@@ -168,7 +195,7 @@ Example Output:
                         {"role": "user", "content": text}
                     ],
                     temperature=0.0,
-                    timeout=60
+                    timeout=60  # Increased timeout for longer content
                 )
                 return response.choices[0].message.content
                 

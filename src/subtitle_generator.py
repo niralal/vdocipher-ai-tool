@@ -100,23 +100,24 @@ class SubtitleGenerator:
             if not file_url:
                 raise ValueError("No audio stream found")
 
-            # Download and transcribe
+            # Get transcription
             print("3/4: Downloading and transcribing audio...")
             downloaded_path = self.vdo_client.download_file(
                 file_url,
                 os.path.join(self.tmp_dir, f"{video_id}.mp3")
             )
             
-            transcription_path = self.media_processor.transcribe_audio(
+            original_text = self.media_processor.transcribe_audio(
                 downloaded_path,
                 language=self.config.LANGUAGE
             )
 
-            # Process subtitles
-            print("4/4: Processing subtitles...")
-            with open(transcription_path, "r", encoding="utf-8") as file:
-                original_text = file.read()
-            
+            # Save original transcription
+            original_path = os.path.join(self.tmp_dir, f"{video_id}_original.srt")
+            with open(original_path, "w", encoding="utf-8") as file:
+                file.write(original_text)
+            print("- Original transcription saved")
+
             # Grammar correction (if enabled)
             if self.config.ENABLE_GRAMMAR_CORRECTION:
                 print("- Correcting Hebrew grammar...")
@@ -124,7 +125,7 @@ class SubtitleGenerator:
                 
                 if corrected_text is None:
                     print("- No grammar corrections needed")
-                    hebrew_path = transcription_path
+                    hebrew_path = original_path
                 else:
                     hebrew_path = os.path.join(self.tmp_dir, f"{video_id}_he.srt")
                     with open(hebrew_path, "w", encoding="utf-8") as file:
@@ -132,7 +133,7 @@ class SubtitleGenerator:
                     print("- Grammar corrections saved")
             else:
                 print("- Grammar correction disabled, using original transcription")
-                hebrew_path = transcription_path
+                hebrew_path = original_path
 
             # Handle Arabic translation if enabled
             arabic_success = True
