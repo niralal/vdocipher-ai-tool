@@ -142,3 +142,53 @@ class VdoCipherClient:
                 flags.append("🗑️ Deletable")
             if flags:
                 print("   " + " | ".join(flags))
+
+    def delete_subtitles(self, video_id):
+        """Delete all existing subtitles for a video"""
+        try:
+            url = f"https://dev.vdocipher.com/api/videos/{video_id}/files"
+            headers = {
+                "Authorization": f"Apisecret {self.api_key}",
+                "Accept": "application/json"
+            }
+            
+            # Get list of files
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            
+            files = response.json()
+            if not files:
+                print("- No files found")
+                return True
+            
+            # Print all files for debugging
+            print("Found files:")
+            for file in files:
+                print(f"- Type: {file.get('type')}, Name: {file.get('name')}, ID: {file.get('id')}")
+                
+            # Delete each subtitle file
+            deleted_count = 0
+            for file in files:
+                name = file.get('name', '')
+                # Check for VTT subtitles by name pattern [LANG] filename.*.vtt
+                if (name.endswith('.vtt') and 
+                    any(lang in name for lang in ['[HE]', '[AR]', '[RU]'])):
+                    
+                    file_id = file.get('id')
+                    if file_id:
+                        delete_url = f"https://dev.vdocipher.com/api/videos/{video_id}/files/{file_id}"
+                        delete_response = requests.delete(delete_url, headers=headers)
+                        delete_response.raise_for_status()
+                        print(f"- Deleted subtitle: {name} (ID: {file_id})")
+                        deleted_count += 1
+            
+            if deleted_count == 0:
+                print("- No subtitle files found to delete")
+            else:
+                print(f"- Successfully deleted {deleted_count} subtitle file(s)")
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error deleting subtitles: {str(e)}")
+            return False

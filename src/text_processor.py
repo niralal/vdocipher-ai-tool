@@ -84,7 +84,7 @@ class TextProcessor:
                         {"role": "user", "content": text}
                     ],
                     temperature=0.0,
-                    timeout=30
+                    timeout=90
                 )
                 
                 return response.choices[0].message.content

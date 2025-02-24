@@ -15,12 +15,12 @@ class SubtitleGenerator:
     def __init__(self):
         """Initialize with configuration and required clients"""
         self.config = Config()
-        self.vdo_client = VdoCipherClient(self.config.API_KEY)
+        self.vdo_client = VdoCipherClient(self.config.VDOCIPHER_API_KEY)
         self.media_processor = MediaProcessor(
             openai_api_key=self.config.OPENAI_API_KEY,
             config=self.config  # Pass the config here
         )
-        self.text_processor = TextProcessor(self.config.OPENAI_API_KEY)
+        self.text_processor = TextProcessor(self.config.OPENAI_API_KEY, self.config)
         # Use the same tmp directory as MediaProcessor
         self.tmp_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "tmp")
 
@@ -70,19 +70,24 @@ class SubtitleGenerator:
             
         Steps:
         1. Get video information from VdoCipher
-        2. Find the original file with audio
-        3. Download the audio
-        4. Generate transcription using Whisper
-        5. Correct grammar using GPT-4
-        6. Upload corrected subtitles back to VdoCipher
+        2. Delete existing subtitles
+        3. Find the original file with audio
+        4. Download the audio
+        5. Generate transcription using Whisper
+        6. Correct grammar using GPT-4
+        7. Upload corrected subtitles back to VdoCipher
         """
         try:
             print(f"\nProcessing video: {video_id}")
-            print("1/4: Getting video info...")
+            print("1/5: Getting video info...")
             video_info = self.vdo_client.get_video_info(video_id)
             
+            # Delete existing subtitles
+            print("2/5: Removing existing subtitles...")
+            self.vdo_client.delete_subtitles(video_id)
+            
             # Find audio URL
-            print("2/4: Finding audio stream...")
+            print("3/5: Finding audio stream...")
             file_url = None
             if isinstance(video_info, list):
                 for item in video_info:
@@ -101,7 +106,7 @@ class SubtitleGenerator:
                 raise ValueError("No audio stream found")
 
             # Get transcription
-            print("3/4: Downloading and transcribing audio...")
+            print("4/5: Downloading and transcribing audio...")
             downloaded_path = self.vdo_client.download_file(
                 file_url,
                 os.path.join(self.tmp_dir, f"{video_id}.mp3")
@@ -173,6 +178,7 @@ class SubtitleGenerator:
             else:
                 print("✗ Some translations failed")
             
+            print("5/5: Processing and uploading subtitles...")
             return hebrew_success and arabic_success and russian_success
             
         except Exception as e:
