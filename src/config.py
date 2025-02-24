@@ -12,6 +12,7 @@ class Config:
     # API Keys
     VDOCIPHER_API_KEY = os.getenv("VDOCIPHER_API_KEY")
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    BAUMANN_API_TOKEN = os.getenv("BAUMANN_API_TOKEN")
     
     # Settings
     MODE = os.getenv("MODE", "batch")

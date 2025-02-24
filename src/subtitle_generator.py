@@ -170,16 +170,20 @@ class SubtitleGenerator:
                     print("- Russian translation failed")
                     russian_success = False
 
-            # Upload Hebrew subtitles and check overall success
+            # Upload Hebrew subtitles to VdoCipher
             hebrew_success = self.vdo_client.upload_subtitle(video_id, hebrew_path, "he")
             
-            if hebrew_success and arabic_success and russian_success:
+            # Upload Hebrew subtitles to Baumann API
+            baumann_success = self.vdo_client.upload_hebrew_captions_to_baumann(video_id, hebrew_path)
+            
+            # Handle Arabic and Russian translations...
+            
+            if hebrew_success and arabic_success and russian_success and baumann_success:
                 print("✓ All processing completed successfully")
             else:
-                print("✗ Some translations failed")
+                print("✗ Some operations failed")
             
-            print("5/5: Processing and uploading subtitles...")
-            return hebrew_success and arabic_success and russian_success
+            return hebrew_success and arabic_success and russian_success and baumann_success
             
         except Exception as e:
             print(f"✗ Error processing video: {str(e)}")

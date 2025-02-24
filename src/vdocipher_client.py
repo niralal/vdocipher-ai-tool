@@ -192,3 +192,29 @@ class VdoCipherClient:
         except Exception as e:
             print(f"Error deleting subtitles: {str(e)}")
             return False
+
+    def upload_hebrew_captions_to_baumann(self, video_id, srt_path):
+        """
+        Upload Hebrew SRT captions to Baumann API endpoint
+        """
+        try:
+            url = f"https://baumann.co.il/api/secure/update-captions/{video_id}"
+            
+            # Read SRT file content
+            with open(srt_path, 'r', encoding='utf-8') as file:
+                srt_content = file.read()
+            
+            headers = {
+                "Authorization": f"Bearer {self.config.BAUMANN_API_TOKEN}",
+                "Content-Type": "text/plain"
+            }
+            
+            response = requests.post(url, data=srt_content, headers=headers)
+            response.raise_for_status()
+            
+            print(f"- Successfully uploaded Hebrew captions to Baumann API")
+            return True
+            
+        except Exception as e:
+            print(f"Error uploading captions to Baumann: {str(e)}")
+            return False
