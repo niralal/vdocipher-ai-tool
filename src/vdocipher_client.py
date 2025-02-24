@@ -2,8 +2,10 @@ import requests
 import subprocess
 
 class VdoCipherClient:
-    def __init__(self, api_key):
+    def __init__(self, api_key, config=None):
+        """Initialize with API key and optional config"""
         self.api_key = api_key
+        self.config = config
         self.base_url = "https://dev.vdocipher.com/api"
         self.headers = {"Authorization": f"Apisecret {api_key}"}
         self.ffmpeg_path = "/usr/local/bin/ffmpeg"  # For macOS
