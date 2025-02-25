@@ -153,8 +153,8 @@ class SubtitleGenerator:
                 print("- Correcting Hebrew grammar...")
                 corrected_text = self.text_processor.correct_grammar(original_text)
                 
-                if corrected_text is None:
-                    print("- No grammar corrections needed")
+                if corrected_text is None or not self.text_processor.is_srt_format(corrected_text):
+                    print("- Using original text (no valid corrections)")
                     hebrew_path = original_path
                 else:
                     hebrew_path = os.path.join(self.tmp_dir, f"{video_id}_he.srt")
