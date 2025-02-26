@@ -47,6 +47,7 @@ class Config:
     # Model settings
     USE_GROQ = os.getenv("USE_GROQ", "true").lower() == "true"
     GROQ_MODEL = os.getenv("GROQ_MODEL", "mixtral-8x7b-32768")
+    GRAMMAR_MODEL = os.getenv("GRAMMAR_MODEL", "gpt-4o")
     
     # Debug logging
     print("\nEnvironment variables loaded:")
@@ -59,7 +60,6 @@ class Config:
     MODE = os.getenv("MODE", "batch")
     LANGUAGE = os.getenv("LANGUAGE", "he")
     WHISPER_MODEL = os.getenv("WHISPER_MODEL", "whisper-1")
-    GRAMMAR_MODEL = os.getenv("GRAMMAR_MODEL", "gpt-4o")
     TRANSLATION_MODEL = os.getenv("TRANSLATION_MODEL", "gpt-4o")
     
     # Features

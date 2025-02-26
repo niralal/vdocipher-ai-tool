@@ -68,41 +68,41 @@ class TextProcessor:
                                 messages=[
                                     {
                                         "role": "system",
-                                        "content": """אתה עורך לשוני מומחה בעברית, המתמחה בתיקון טקסט מדעי וטכני.
+                                        "content": """אתה עורך לשוני מקצועי בעברית. עליך לתקן את הטקסט תוך שמירה על פורמט SRT.
 
-הנחיות לתיקון:
+חובה לבצע את התיקונים הבאים:
 
-1. תיקוני דקדוק ותחביר:
-   - תיקון התאמת זכר/נקבה
-   - תיקון התאמת יחיד/רבים
-   - תיקון שגיאות כתיב נפוצות
-   - תיקון משפטים לא תקינים תחבירית
+1. תיקון מילים שגויות:
+   - המילה "חול" כשהכוונה לחוץ לארץ חייבת להיות מתוקנת ל"חו״ל"
+   - "את השלום המס" חייב להיות מתוקן ל"תשלום המס"
+   - בהקשר של מחירים: "פי 0" חייב להיות "P0"
 
-2. תיקונים ספציפיים:
-   - "בשביל ש" → "כדי ש"
-   - "על מנת" → "כדי"
-   - "מה ש" → "מה ש" (לוודא רווח)
-   - "אנחנו" בתחילת משפט → "אנו"
-   - "בגלל ש" → "מפני ש" / "משום ש"
-   - "חול" → "חו״ל" (כשמדובר על חוץ לארץ)
+2. תיקוני דקדוק:
+   - התאמת זכר/נקבה (לדוגמה: "הצעה" בהקשר כלכלי צריך להיות "היצע")
+   - התאמת יחיד/רבים
+   - תיקון משפטים לא תקינים
 
-3. תיקון מונחים מקצועיים:
-   - "הצעה" → "היצע" (בהקשר כלכלי)
-   - "ביקוש" ו"היצע" הם בזכר
-   - לתקן מונחים טכניים ומדעיים שגויים
+3. דוגמאות לתיקונים נדרשים:
+   מקור: "המחיר בחול הוא 200 שקלים"
+   תיקון: "המחיר בחו״ל הוא 200 שקלים"
 
-4. כללי זהב:
-   - אין לשנות את המשמעות
-   - אין לשנות מספרי שורות או זמנים
-   - לשמור על סגנון הדיבור של המרצה
-   - לתקן רק טעויות ברורות
-   - להשאיר ביטויים יומיומיים
+   מקור: "לאחר את השלום המס"
+   תיקון: "לאחר תשלום המס"
 
-אם אין טעויות - החזר בדיוק את אותו טקסט."""
+   מקור: "במחיר פי 0"
+   תיקון: "במחיר P0"
+
+חשוב:
+- חובה לשמור על מספרי השורות והתזמונים המקוריים
+- חובה לתקן כל שגיאת כתיב שמופיעה
+- יש לשמור על המשמעות המקורית
+- אם אין צורך בתיקון, החזר את הטקסט המקורי
+
+בדוק כל שורה בקפידה ותקן את כל השגיאות שמופיעות."""
                                     },
                                     {"role": "user", "content": chunk}
                                 ],
-                                temperature=0.0,
+                                temperature=0.1,
                             )
                         else:
                             response = self.openai_client.chat.completions.create(
@@ -110,51 +110,53 @@ class TextProcessor:
                                 messages=[
                                     {
                                         "role": "system",
-                                        "content": """אתה עורך לשוני מומחה בעברית, המתמחה בתיקון טקסט מדעי וטכני.
+                                        "content": """אתה עורך לשוני מקצועי בעברית. עליך לתקן את הטקסט תוך שמירה על פורמט SRT.
 
-הנחיות לתיקון:
+חובה לבצע את התיקונים הבאים:
 
-1. תיקוני דקדוק ותחביר:
-   - תיקון התאמת זכר/נקבה
-   - תיקון התאמת יחיד/רבים
-   - תיקון שגיאות כתיב נפוצות
-   - תיקון משפטים לא תקינים תחבירית
+1. תיקון מילים שגויות:
+   - המילה "חול" כשהכוונה לחוץ לארץ חייבת להיות מתוקנת ל"חו״ל"
+   - "את השלום המס" חייב להיות מתוקן ל"תשלום המס"
+   - בהקשר של מחירים: "פי 0" חייב להיות "P0"
 
-2. תיקונים ספציפיים:
-   - "בשביל ש" → "כדי ש"
-   - "על מנת" → "כדי"
-   - "מה ש" → "מה ש" (לוודא רווח)
-   - "אנחנו" בתחילת משפט → "אנו"
-   - "בגלל ש" → "מפני ש" / "משום ש"
-   - "חול" → "חו״ל" (כשמדובר על חוץ לארץ)
+2. תיקוני דקדוק:
+   - התאמת זכר/נקבה (לדוגמה: "הצעה" בהקשר כלכלי צריך להיות "היצע")
+   - התאמת יחיד/רבים
+   - תיקון משפטים לא תקינים
 
-3. תיקון מונחים מקצועיים:
-   - "הצעה" → "היצע" (בהקשר כלכלי)
-   - "ביקוש" ו"היצע" הם בזכר
-   - לתקן מונחים טכניים ומדעיים שגויים
+3. דוגמאות לתיקונים נדרשים:
+   מקור: "המחיר בחול הוא 200 שקלים"
+   תיקון: "המחיר בחו״ל הוא 200 שקלים"
 
-4. כללי זהב:
-   - אין לשנות את המשמעות
-   - אין לשנות מספרי שורות או זמנים
-   - לשמור על סגנון הדיבור של המרצה
-   - לתקן רק טעויות ברורות
-   - להשאיר ביטויים יומיומיים
+   מקור: "לאחר את השלום המס"
+   תיקון: "לאחר תשלום המס"
 
-אם אין טעויות - החזר בדיוק את אותו טקסט."""
+   מקור: "במחיר פי 0"
+   תיקון: "במחיר P0"
+
+חשוב:
+- חובה לשמור על מספרי השורות והתזמונים המקוריים
+- חובה לתקן כל שגיאת כתיב שמופיעה
+- יש לשמור על המשמעות המקורית
+- אם אין צורך בתיקון, החזר את הטקסט המקורי
+
+בדוק כל שורה בקפידה ותקן את כל השגיאות שמופיעות."""
                                     },
                                     {"role": "user", "content": chunk}
                                 ],
-                                temperature=0.0,
+                                temperature=0.1,
                                 timeout=180
                             )
                         
                         corrected_text = response.choices[0].message.content
                         
-                        # Check if this chunk needs corrections
-                        if not self.is_srt_format(corrected_text):
-                            corrected_chunks.append(chunk)  # Use original if no corrections needed
-                        else:
+                        # If the response is valid SRT or contains actual corrections, use it
+                        if self.is_srt_format(corrected_text):
                             corrected_chunks.append(corrected_text)
+                        else:
+                            # If the model returned plain text without SRT formatting,
+                            # it might indicate no corrections were needed
+                            corrected_chunks.append(chunk)
                         break
                         
                     except Exception as e:
@@ -241,7 +243,20 @@ class TextProcessor:
                             response = self.groq_client.chat.completions.create(
                                 model=self.groq_model,
                                 messages=[
-                                    {"role": "system", "content": """You are a professional translator from Hebrew to Arabic..."""},
+                                    {
+                                        "role": "system", 
+                                        "content": """You are a professional translator from Hebrew to Arabic.
+
+Rules:
+1. Translate the text between timestamps from Hebrew to Arabic
+2. Keep all SRT formatting exactly the same:
+   - Keep subtitle numbers
+   - Keep timestamps exactly as they are
+   - Keep line breaks in the same places
+3. Maintain technical and scientific terms accuracy
+4. Keep any numbers and special characters
+5. Do not change or translate timestamps"""
+                                    },
                                     {"role": "user", "content": chunk}
                                 ],
                                 temperature=0.0,
@@ -309,7 +324,20 @@ Rules:
                             response = self.groq_client.chat.completions.create(
                                 model=self.groq_model,
                                 messages=[
-                                    {"role": "system", "content": """You are a professional translator from Hebrew to Russian..."""},
+                                    {
+                                        "role": "system", 
+                                        "content": """You are a professional translator from Hebrew to Russian.
+
+Rules:
+1. Translate the text between timestamps from Hebrew to Russian
+2. Keep all SRT formatting exactly the same:
+   - Keep subtitle numbers
+   - Keep timestamps exactly as they are
+   - Keep line breaks in the same places
+3. Maintain technical and scientific terms accuracy
+4. Keep any numbers and special characters
+5. Do not change or translate timestamps"""
+                                    },
                                     {"role": "user", "content": chunk}
                                 ],
                                 temperature=0.0,
