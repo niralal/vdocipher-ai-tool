@@ -1,5 +1,5 @@
 """
-TextProcessor: Handles grammar correction using OpenAI's GPT-4.
+TextProcessor: Handles grammar correction using OpenAI's GPT-4 or Groq.
 This module takes SRT format subtitles and corrects only spelling/grammar mistakes
 while preserving exact meaning, timing, and word choice, with special attention
 to Hebrew technical and scientific content.
@@ -7,17 +7,24 @@ to Hebrew technical and scientific content.
 
 import time
 from openai import OpenAI
+import groq
 
 class TextProcessor:
     def __init__(self, openai_api_key, config=None):
         """Initialize with OpenAI API key and optional config"""
         self.openai_client = OpenAI(api_key=openai_api_key)
+        if hasattr(config, 'GROQ_API_KEY') and config.GROQ_API_KEY:
+            self.groq_client = groq.Groq(api_key=config.GROQ_API_KEY)
+        else:
+            self.groq_client = None
         self.config = config
         self.MAX_RETRIES = 3
         self.RETRY_DELAY = 5
         # Get models from config or use defaults
         self.grammar_model = self.config.GRAMMAR_MODEL if self.config else "gpt-3.5-turbo"
         self.translation_model = self.config.TRANSLATION_MODEL if self.config else "gpt-3.5-turbo"
+        self.use_groq = getattr(config, 'USE_GROQ', False)
+        self.groq_model = getattr(config, 'GROQ_MODEL', 'mixtral-8x7b-32768')
 
     def is_srt_format(self, text):
         """Check if text follows SRT format"""
@@ -41,23 +48,27 @@ class TextProcessor:
     def correct_grammar(self, text):
         """
         Correct spelling and grammar mistakes in Hebrew SRT subtitles.
-        Handles large files by splitting into chunks.
+        Uses either Groq or OpenAI based on configuration.
         """
         try:
             chunks = self.split_srt_into_chunks(text)
             corrected_chunks = []
+            
+            print(f"\nUsing {'Groq' if self.use_groq else 'OpenAI'} for grammar correction")
+            print(f"Model: {self.groq_model if self.use_groq else self.grammar_model}")
             
             for i, chunk in enumerate(chunks, 1):
                 print(f"- Correcting grammar chunk {i}/{len(chunks)}...")
                 retries = 0
                 while retries < self.MAX_RETRIES:
                     try:
-                        response = self.openai_client.chat.completions.create(
-                            model=self.grammar_model,
-                            messages=[
-                                {
-                                    "role": "system",
-                                    "content": """אתה עורך לשוני מומחה בעברית, המתמחה בתיקון טקסט מדעי וטכני.
+                        if self.use_groq and self.groq_client:
+                            response = self.groq_client.chat.completions.create(
+                                model=self.groq_model,
+                                messages=[
+                                    {
+                                        "role": "system",
+                                        "content": """אתה עורך לשוני מומחה בעברית, המתמחה בתיקון טקסט מדעי וטכני.
 
 הנחיות לתיקון:
 
@@ -88,12 +99,55 @@ class TextProcessor:
    - להשאיר ביטויים יומיומיים
 
 אם אין טעויות - החזר בדיוק את אותו טקסט."""
-                                },
-                                {"role": "user", "content": chunk}
-                            ],
-                            temperature=0.0,
-                            timeout=180  # 3 minutes per chunk
-                        )
+                                    },
+                                    {"role": "user", "content": chunk}
+                                ],
+                                temperature=0.0,
+                            )
+                        else:
+                            response = self.openai_client.chat.completions.create(
+                                model=self.grammar_model,
+                                messages=[
+                                    {
+                                        "role": "system",
+                                        "content": """אתה עורך לשוני מומחה בעברית, המתמחה בתיקון טקסט מדעי וטכני.
+
+הנחיות לתיקון:
+
+1. תיקוני דקדוק ותחביר:
+   - תיקון התאמת זכר/נקבה
+   - תיקון התאמת יחיד/רבים
+   - תיקון שגיאות כתיב נפוצות
+   - תיקון משפטים לא תקינים תחבירית
+
+2. תיקונים ספציפיים:
+   - "בשביל ש" → "כדי ש"
+   - "על מנת" → "כדי"
+   - "מה ש" → "מה ש" (לוודא רווח)
+   - "אנחנו" בתחילת משפט → "אנו"
+   - "בגלל ש" → "מפני ש" / "משום ש"
+   - "חול" → "חו״ל" (כשמדובר על חוץ לארץ)
+
+3. תיקון מונחים מקצועיים:
+   - "הצעה" → "היצע" (בהקשר כלכלי)
+   - "ביקוש" ו"היצע" הם בזכר
+   - לתקן מונחים טכניים ומדעיים שגויים
+
+4. כללי זהב:
+   - אין לשנות את המשמעות
+   - אין לשנות מספרי שורות או זמנים
+   - לשמור על סגנון הדיבור של המרצה
+   - לתקן רק טעויות ברורות
+   - להשאיר ביטויים יומיומיים
+
+אם אין טעויות - החזר בדיוק את אותו טקסט."""
+                                    },
+                                    {"role": "user", "content": chunk}
+                                ],
+                                temperature=0.0,
+                                timeout=180
+                            )
+                        
                         corrected_text = response.choices[0].message.content
                         
                         # Check if this chunk needs corrections
@@ -169,23 +223,36 @@ class TextProcessor:
     def translate_to_arabic(self, text):
         """
         Translate Hebrew SRT subtitles to Arabic while preserving SRT format.
-        Handles large files by splitting into chunks.
+        Uses either Groq or OpenAI based on configuration.
         """
         try:
             chunks = self.split_srt_into_chunks(text)
             translated_chunks = []
+            
+            print(f"\nUsing {'Groq' if self.use_groq else 'OpenAI'} for Arabic translation")
+            print(f"Model: {self.groq_model if self.use_groq else self.translation_model}")
             
             for i, chunk in enumerate(chunks, 1):
                 print(f"- Translating chunk {i}/{len(chunks)}...")
                 retries = 0
                 while retries < self.MAX_RETRIES:
                     try:
-                        response = self.openai_client.chat.completions.create(
-                            model=self.translation_model,
-                            messages=[
-                                {
-                                    "role": "system", 
-                                    "content": """You are a professional translator from Hebrew to Arabic.
+                        if self.use_groq and self.groq_client:
+                            response = self.groq_client.chat.completions.create(
+                                model=self.groq_model,
+                                messages=[
+                                    {"role": "system", "content": """You are a professional translator from Hebrew to Arabic..."""},
+                                    {"role": "user", "content": chunk}
+                                ],
+                                temperature=0.0,
+                            )
+                        else:
+                            response = self.openai_client.chat.completions.create(
+                                model=self.translation_model,
+                                messages=[
+                                    {
+                                        "role": "system", 
+                                        "content": """You are a professional translator from Hebrew to Arabic.
 
 Rules:
 1. Translate the text between timestamps from Hebrew to Arabic
@@ -196,12 +263,12 @@ Rules:
 3. Maintain technical and scientific terms accuracy
 4. Keep any numbers and special characters
 5. Do not change or translate timestamps"""
-                                },
-                                {"role": "user", "content": chunk}
-                            ],
-                            temperature=0.0,
-                            timeout=180  # 3 minutes per chunk
-                        )
+                                    },
+                                    {"role": "user", "content": chunk}
+                                ],
+                                temperature=0.0,
+                                timeout=180  # 3 minutes per chunk
+                            )
                         translated_chunks.append(response.choices[0].message.content)
                         break
                     except Exception as e:
@@ -224,23 +291,36 @@ Rules:
     def translate_to_russian(self, text):
         """
         Translate Hebrew SRT subtitles to Russian while preserving SRT format.
-        Handles large files by splitting into chunks.
+        Uses either Groq or OpenAI based on configuration.
         """
         try:
             chunks = self.split_srt_into_chunks(text)
             translated_chunks = []
+            
+            print(f"\nUsing {'Groq' if self.use_groq else 'OpenAI'} for Russian translation")
+            print(f"Model: {self.groq_model if self.use_groq else self.translation_model}")
             
             for i, chunk in enumerate(chunks, 1):
                 print(f"- Translating chunk {i}/{len(chunks)}...")
                 retries = 0
                 while retries < self.MAX_RETRIES:
                     try:
-                        response = self.openai_client.chat.completions.create(
-                            model=self.translation_model,
-                            messages=[
-                                {
-                                    "role": "system", 
-                                    "content": """You are a professional translator from Hebrew to Russian.
+                        if self.use_groq and self.groq_client:
+                            response = self.groq_client.chat.completions.create(
+                                model=self.groq_model,
+                                messages=[
+                                    {"role": "system", "content": """You are a professional translator from Hebrew to Russian..."""},
+                                    {"role": "user", "content": chunk}
+                                ],
+                                temperature=0.0,
+                            )
+                        else:
+                            response = self.openai_client.chat.completions.create(
+                                model=self.translation_model,
+                                messages=[
+                                    {
+                                        "role": "system", 
+                                        "content": """You are a professional translator from Hebrew to Russian.
 
 Rules:
 1. Translate the text between timestamps from Hebrew to Russian
@@ -251,12 +331,12 @@ Rules:
 3. Maintain technical and scientific terms accuracy
 4. Keep any numbers and special characters
 5. Do not change or translate timestamps"""
-                                },
-                                {"role": "user", "content": chunk}
-                            ],
-                            temperature=0.0,
-                            timeout=180  # 3 minutes per chunk
-                        )
+                                    },
+                                    {"role": "user", "content": chunk}
+                                ],
+                                temperature=0.0,
+                                timeout=180  # 3 minutes per chunk
+                            )
                         translated_chunks.append(response.choices[0].message.content)
                         break
                     except Exception as e:

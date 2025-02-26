@@ -41,13 +41,19 @@ class Config:
     # API Keys
     VDOCIPHER_API_KEY = os.getenv("VDOCIPHER_API_KEY")
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY")
     BAUMANN_API_TOKEN = os.getenv("BAUMANN_API_TOKEN")
+    
+    # Model settings
+    USE_GROQ = os.getenv("USE_GROQ", "true").lower() == "true"
+    GROQ_MODEL = os.getenv("GROQ_MODEL", "mixtral-8x7b-32768")
     
     # Debug logging
     print("\nEnvironment variables loaded:")
     print(f"OPENAI_API_KEY = {OPENAI_API_KEY[:10]}...{OPENAI_API_KEY[-10:] if OPENAI_API_KEY else 'None'}")
     print(f"VDOCIPHER_API_KEY = {VDOCIPHER_API_KEY[:5]}... (truncated)")
     print(f"MODE = {os.getenv('MODE')}")
+    print(f"Using {'Groq' if USE_GROQ else 'OpenAI'} model: {GROQ_MODEL if USE_GROQ else GRAMMAR_MODEL}")
     
     # Settings
     MODE = os.getenv("MODE", "batch")

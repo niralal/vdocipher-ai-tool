@@ -1,4 +1,5 @@
 openai
+groq
 requests
 python-dotenv
 ffmpeg-python
