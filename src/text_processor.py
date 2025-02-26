@@ -197,10 +197,10 @@ class TextProcessor:
         return chunks
 
     def fix_srt_numbering(self, text):
-        """Renumber SRT entries sequentially"""
+        """Renumber SRT entries sequentially and fix timestamp formatting"""
         if not text:
             return text
-            
+        
         entries = text.strip().split('\n\n')
         fixed_entries = []
         counter = 1
@@ -208,13 +208,23 @@ class TextProcessor:
         for entry in entries:
             if not entry.strip():
                 continue
-                
+            
             lines = entry.split('\n')
             if len(lines) >= 2:  # Valid SRT entry should have at least number and timestamp
-                lines[0] = str(counter)  # Replace number with sequential counter
+                # Fix the entry number
+                lines[0] = str(counter)
+                
+                # Fix timestamp formatting - remove any extra spaces
+                if len(lines) > 1 and ' --> ' in lines[1]:
+                    timestamp_parts = lines[1].split(' --> ')
+                    if len(timestamp_parts) == 2:
+                        start_time = timestamp_parts[0].strip()
+                        end_time = timestamp_parts[1].strip()
+                        lines[1] = f"{start_time} --> {end_time}"
+                
                 fixed_entries.append('\n'.join(lines))
                 counter += 1
-                
+            
         return '\n\n'.join(fixed_entries)
 
     def combine_chunks(self, chunks):
