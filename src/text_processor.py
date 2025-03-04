@@ -144,7 +144,7 @@ class TextProcessor:
                                     },
                                     {"role": "user", "content": chunk}
                                 ],
-                                temperature=0.1,
+                                temperature=0.2,
                                 timeout=180
                             )
                         
@@ -249,24 +249,33 @@ class TextProcessor:
                 retries = 0
                 while retries < self.MAX_RETRIES:
                     try:
+                        system_prompt = """You are a professional translator from Hebrew to Arabic.
+
+Rules:
+1. Translate ONLY the text content between timestamps from Hebrew to Arabic
+2. DO NOT modify any of these elements:
+   - Subtitle numbers (e.g., "1", "2", "3")
+   - Timestamps (e.g., "00:00:01,000 --> 00:00:05,000")
+   - Line breaks position
+3. Maintain technical and scientific terms accuracy
+4. Keep any numbers and special characters exactly as they appear
+5. Each subtitle block must maintain this exact format:
+
+[number]
+[timestamp] --> [timestamp]
+[translated text]
+[empty line]
+
+Example of correct format:
+1
+00:00:01,000 --> 00:00:05,000
+النص المترجم هنا
+"""
                         if self.use_groq and self.groq_client:
                             response = self.groq_client.chat.completions.create(
                                 model=self.groq_model,
                                 messages=[
-                                    {
-                                        "role": "system", 
-                                        "content": """You are a professional translator from Hebrew to Arabic.
-
-Rules:
-1. Translate the text between timestamps from Hebrew to Arabic
-2. Keep all SRT formatting exactly the same:
-   - Keep subtitle numbers
-   - Keep timestamps exactly as they are
-   - Keep line breaks in the same places
-3. Maintain technical and scientific terms accuracy
-4. Keep any numbers and special characters
-5. Do not change or translate timestamps"""
-                                    },
+                                    {"role": "system", "content": system_prompt},
                                     {"role": "user", "content": chunk}
                                 ],
                                 temperature=0.0,
@@ -275,27 +284,27 @@ Rules:
                             response = self.openai_client.chat.completions.create(
                                 model=self.translation_model,
                                 messages=[
-                                    {
-                                        "role": "system", 
-                                        "content": """You are a professional translator from Hebrew to Arabic.
-
-Rules:
-1. Translate the text between timestamps from Hebrew to Arabic
-2. Keep all SRT formatting exactly the same:
-   - Keep subtitle numbers
-   - Keep timestamps exactly as they are
-   - Keep line breaks in the same places
-3. Maintain technical and scientific terms accuracy
-4. Keep any numbers and special characters
-5. Do not change or translate timestamps"""
-                                    },
+                                    {"role": "system", "content": system_prompt},
                                     {"role": "user", "content": chunk}
                                 ],
-                                temperature=0.0,
-                                timeout=180  # 3 minutes per chunk
+                                temperature=0.0
                             )
-                        translated_chunks.append(response.choices[0].message.content)
-                        break
+                        
+                        translated_text = response.choices[0].message.content.strip()
+                        
+                        # Verify the translation maintains SRT format
+                        if self.is_srt_format(translated_text):
+                            # Add timestamp validation before accepting the translation
+                            if self.validate_timestamps(translated_text):
+                                translated_chunks.append(translated_text)
+                                break
+                            else:
+                                print(f"Warning: Invalid timestamps detected, retrying...")
+                                retries += 1
+                        else:
+                            print(f"Warning: Translation returned invalid SRT format, retrying...")
+                            retries += 1
+                            
                     except Exception as e:
                         retries += 1
                         if retries < self.MAX_RETRIES:
@@ -306,12 +315,48 @@ Rules:
                             print(f"Failed to translate chunk after {self.MAX_RETRIES} attempts: {str(e)}")
                             return None
             
-            # Combine chunks and fix numbering
-            return self.combine_chunks(translated_chunks)
+            # Combine chunks and validate final format
+            final_translation = self.combine_chunks(translated_chunks)
+            if not self.validate_timestamps(final_translation):
+                print("Error: Final translation contains invalid timestamps")
+                return None
+            
+            return final_translation
                 
         except Exception as e:
             print(f"Translation failed: {str(e)}")
             return None
+
+    def validate_timestamps(self, text):
+        """
+        Validate that all timestamps in the SRT text are in correct format.
+        """
+        import re
+        
+        # Regular expression for SRT timestamp format
+        timestamp_pattern = r'(\d{2}):(\d{2}):(\d{2}),(\d{3})\s-->\s(\d{2}):(\d{2}):(\d{2}),(\d{3})'
+        
+        lines = text.split('\n')
+        for line in lines:
+            if '-->' in line:
+                # Check if the line matches the timestamp pattern
+                match = re.match(timestamp_pattern, line.strip())
+                if not match:
+                    return False
+                
+                # Extract start and end times
+                start_h, start_m, start_s, start_ms = map(int, match.groups()[:4])
+                end_h, end_m, end_s, end_ms = map(int, match.groups()[4:])
+                
+                # Convert to milliseconds for comparison
+                start_time = ((start_h * 3600 + start_m * 60 + start_s) * 1000) + start_ms
+                end_time = ((end_h * 3600 + end_m * 60 + end_s) * 1000) + end_ms
+                
+                # Verify end time is after start time
+                if end_time <= start_time:
+                    return False
+        
+        return True
 
     def translate_to_russian(self, text):
         """
@@ -330,24 +375,33 @@ Rules:
                 retries = 0
                 while retries < self.MAX_RETRIES:
                     try:
+                        system_prompt = """You are a professional translator from Hebrew to Russian.
+
+Rules:
+1. Translate ONLY the text content between timestamps from Hebrew to Russian
+2. DO NOT modify any of these elements:
+   - Subtitle numbers (e.g., "1", "2", "3")
+   - Timestamps (e.g., "00:00:01,000 --> 00:00:05,000")
+   - Line breaks position
+3. Maintain technical and scientific terms accuracy
+4. Keep any numbers and special characters exactly as they appear
+5. Each subtitle block must maintain this exact format:
+
+[number]
+[timestamp] --> [timestamp]
+[translated text]
+[empty line]
+
+Example of correct format:
+1
+00:00:01,000 --> 00:00:05,000
+Переведенный текст здесь
+"""
                         if self.use_groq and self.groq_client:
                             response = self.groq_client.chat.completions.create(
                                 model=self.groq_model,
                                 messages=[
-                                    {
-                                        "role": "system", 
-                                        "content": """You are a professional translator from Hebrew to Russian.
-
-Rules:
-1. Translate the text between timestamps from Hebrew to Russian
-2. Keep all SRT formatting exactly the same:
-   - Keep subtitle numbers
-   - Keep timestamps exactly as they are
-   - Keep line breaks in the same places
-3. Maintain technical and scientific terms accuracy
-4. Keep any numbers and special characters
-5. Do not change or translate timestamps"""
-                                    },
+                                    {"role": "system", "content": system_prompt},
                                     {"role": "user", "content": chunk}
                                 ],
                                 temperature=0.0,
@@ -356,27 +410,22 @@ Rules:
                             response = self.openai_client.chat.completions.create(
                                 model=self.translation_model,
                                 messages=[
-                                    {
-                                        "role": "system", 
-                                        "content": """You are a professional translator from Hebrew to Russian.
-
-Rules:
-1. Translate the text between timestamps from Hebrew to Russian
-2. Keep all SRT formatting exactly the same:
-   - Keep subtitle numbers
-   - Keep timestamps exactly as they are
-   - Keep line breaks in the same places
-3. Maintain technical and scientific terms accuracy
-4. Keep any numbers and special characters
-5. Do not change or translate timestamps"""
-                                    },
+                                    {"role": "system", "content": system_prompt},
                                     {"role": "user", "content": chunk}
                                 ],
-                                temperature=0.0,
-                                timeout=180  # 3 minutes per chunk
+                                temperature=0.0
                             )
-                        translated_chunks.append(response.choices[0].message.content)
-                        break
+                        
+                        translated_text = response.choices[0].message.content.strip()
+                        
+                        # Verify the translation maintains SRT format
+                        if self.is_srt_format(translated_text):
+                            translated_chunks.append(translated_text)
+                            break
+                        else:
+                            print(f"Warning: Translation returned invalid SRT format, retrying...")
+                            retries += 1
+                            
                     except Exception as e:
                         retries += 1
                         if retries < self.MAX_RETRIES:
@@ -387,8 +436,13 @@ Rules:
                             print(f"Failed to translate chunk after {self.MAX_RETRIES} attempts: {str(e)}")
                             return None
             
-            # Combine chunks and fix numbering
-            return self.combine_chunks(translated_chunks)
+            # Combine chunks and validate final format
+            final_translation = self.combine_chunks(translated_chunks)
+            if not self.is_srt_format(final_translation):
+                print("Error: Final translation is not in valid SRT format")
+                return None
+            
+            return final_translation
                 
         except Exception as e:
             print(f"Translation failed: {str(e)}")
