@@ -3,6 +3,10 @@ Main entry point for the subtitle generation process.
 Supports both single video and batch processing from CSV.
 """
 
+print("=====================================")
+print("DEFINITELY running updated version!!!")
+print("=====================================")
+
 import os
 from src.subtitle_generator import SubtitleGenerator
 from src.config import Config

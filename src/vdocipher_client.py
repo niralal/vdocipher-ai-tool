@@ -200,18 +200,22 @@ class VdoCipherClient:
         Upload Hebrew SRT captions to Baumann API endpoint
         """
         try:
-            url = f"https://baumann.co.il/api/secure/update-captions/{video_id}"
+            url = f"https://baumann.co.il/api/video-transcriptions"
             
             # Read SRT file content
             with open(srt_path, 'r', encoding='utf-8') as file:
                 srt_content = file.read()
             
             headers = {
-                "Authorization": f"Bearer {self.config.BAUMANN_API_TOKEN}",
-                "Content-Type": "text/plain"
+                "Content-Type": "application/json"
+            }
+            # Prepare data with video_cipher_id and content parameters
+            data = {
+                'video_cipher_id': video_id,
+                'content': srt_content
             }
             
-            response = requests.post(url, data=srt_content, headers=headers)
+            response = requests.post(url, json=data, headers=headers)
             response.raise_for_status()
             
             print(f"- Successfully uploaded Hebrew captions to Baumann API")
