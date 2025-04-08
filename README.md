@@ -88,3 +88,6 @@ Generated subtitle files are saved in the `tmp/` directory in SRT format:
 
 # Run in background with logging
 railway run "python main.py > output.log 2>&1 &"
+
+# Run in parallel with status updates
+python run_parallel.py --max-workers 4 --status-interval 30

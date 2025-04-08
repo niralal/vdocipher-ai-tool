@@ -204,8 +204,60 @@ class SubtitleGenerator:
                 failed = [k for k, v in status.items() if not v]
                 print(f"  Failed operations: {', '.join(failed)}")
             
+            # Update results file
+            self._update_results_file(video_id, status)
+            
             return all(status.values()), status
             
         except Exception as e:
             print(f"✗ Error processing video: {str(e)}")
+            # Update results file even in case of error
+            self._update_results_file(video_id, status)
             return False, status
+
+    def _update_results_file(self, video_id, status):
+        """Update the results CSV file with the current video status"""
+        results_path = os.path.join(self.tmp_dir, 'processing_results.csv')
+        
+        # Create tmp directory if it doesn't exist
+        os.makedirs(os.path.dirname(results_path), exist_ok=True)
+        
+        # Read existing results
+        results = []
+        try:
+            if os.path.exists(results_path):
+                with open(results_path, 'r', encoding='utf-8') as file:
+                    reader = csv.DictReader(file)
+                    for row in reader:
+                        # Keep all rows that don't relate to the current video
+                        if row.get('video_id') != video_id:
+                            results.append(row)
+        except Exception as e:
+            print(f"Warning: Error reading results file: {str(e)}")
+        
+        # Add the new result
+        result = {
+            'video_id': video_id,
+            'sent_to_baumann': str(status.get('baumann', False)).lower(),
+            'ru_translated': str(status.get('russian', False)).lower(),
+            'ar_translated': str(status.get('arabic', False)).lower(),
+            'vdocipher_uploaded': str(status.get('vdocipher', False)).lower()
+        }
+        results.append(result)
+        
+        # Write the file
+        try:
+            with open(results_path, 'w', newline='', encoding='utf-8') as file:
+                fieldnames = ['video_id', 'sent_to_baumann', 'ru_translated', 
+                             'ar_translated', 'vdocipher_uploaded']
+                writer = csv.DictWriter(file, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(results)
+                
+            # Flush buffer to disk
+            file.flush()
+            os.fsync(file.fileno())
+            
+            print(f"✓ Updated results file for video {video_id}")
+        except Exception as e:
+            print(f"✗ Error updating results file: {str(e)}")
