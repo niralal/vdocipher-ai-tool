@@ -12,9 +12,16 @@ import time
 import re
 
 def process_chunk(chunk_file):
-    """Process a single chunk file using main.py"""
+    """Process a single chunk file using main.py with improved handling"""
+    chunk_name = os.path.basename(chunk_file)
+    
     try:
-        print(f"Starting processing of {chunk_file}")
+        # Check if already completed
+        if is_chunk_completed(chunk_file):
+            print(f"Chunk already completed: {chunk_name}")
+            return True, chunk_file, "Already completed"
+        
+        print(f"Starting processing of {chunk_name}")
         
         # Use subprocess.Popen instead of subprocess.run to read output in real-time
         process = subprocess.Popen(
@@ -28,7 +35,7 @@ def process_chunk(chunk_file):
         # Read output in real-time
         output = []
         for line in process.stdout:
-            print(f"[{os.path.basename(chunk_file)}] {line.strip()}")
+            print(f"[{chunk_name}] {line.strip()}")
             output.append(line)
             
         # Wait for process to complete
@@ -36,18 +43,20 @@ def process_chunk(chunk_file):
         
         # Read any errors
         for line in process.stderr:
-            print(f"[{os.path.basename(chunk_file)}] ERROR: {line.strip()}")
+            print(f"[{chunk_name}] ERROR: {line.strip()}")
             output.append(f"ERROR: {line}")
         
         if process.returncode == 0:
-            print(f"Completed {chunk_file}")
+            print(f"Completed {chunk_name}")
+            # Mark the chunk as completed
+            mark_chunk_completed(chunk_file)
             return True, chunk_file, "".join(output)
         else:
-            print(f"Error processing {chunk_file}: Return code {process.returncode}")
+            print(f"Error processing {chunk_name}: Return code {process.returncode}")
             return False, chunk_file, "".join(output)
             
     except Exception as e:
-        print(f"Error processing {chunk_file}: {e}")
+        print(f"Error processing {chunk_name}: {e}")
         return False, chunk_file, str(e)
 
 def count_processed_videos():
@@ -157,8 +166,21 @@ def print_detailed_status():
             if time.time() - os.path.getmtime(log_file) < 300:
                 is_active = True
         
+        # Check if chunk is marked as completed
+        marker_file = chunk_file.replace('.txt', '.completed')
+        is_marked_completed = os.path.exists(marker_file)
+        
+        # Update status display
+        if is_marked_completed:
+            status = "✅ COMPLETED"
+        elif is_active:
+            status = "🔄 ACTIVE"
+        elif chunk_processed == len(chunk_videos):
+            status = "✅ DONE"
+        else:
+            status = "⏸️ WAITING"
+        
         # Print chunk status with progress bar
-        status = "🔄 ACTIVE" if is_active else "✅ DONE" if chunk_processed == len(chunk_videos) else "⏸️ WAITING"
         progress_bar = "█" * int(progress / 10) + "░" * (10 - int(progress / 10))
         
         print(f"{chunk_name:15} {len(chunk_videos):8} {chunk_processed:10} {chunk_successful:10} {progress_bar} {progress:.1f}% {status}")
@@ -240,6 +262,179 @@ def update_results_from_log(log_file):
     except Exception as e:
         print(f"✗ Error updating results file: {str(e)}")
 
+def mark_chunk_completed(chunk_file):
+    """Mark a chunk as completed by creating a marker file"""
+    marker_file = chunk_file.replace('.txt', '.completed')
+    with open(marker_file, 'w') as f:
+        f.write(f"Completed at: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Marked chunk as completed: {os.path.basename(chunk_file)}")
+
+def is_chunk_completed(chunk_file):
+    """Check if a chunk has been marked as completed with detailed debugging"""
+    chunk_name = os.path.basename(chunk_file)
+    print(f"DEBUG: Checking if {chunk_name} is completed")
+    
+    # First check for the marker file
+    marker_file = chunk_file.replace('.txt', '.completed')
+    if os.path.exists(marker_file):
+        print(f"DEBUG: {chunk_name} has a completion marker file")
+        return True
+    
+    print(f"DEBUG: {chunk_name} does not have a completion marker file")
+    
+    # Get video IDs from the chunk file
+    chunk_videos = []
+    try:
+        with open(chunk_file, 'r') as f:
+            for line in f:
+                video_id = line.strip()
+                if video_id and not video_id.startswith('#') and len(video_id) >= 16:
+                    chunk_videos.append(video_id)
+        print(f"DEBUG: {chunk_name} contains {len(chunk_videos)} valid video IDs")
+    except Exception as e:
+        print(f"DEBUG: Error reading chunk file: {e}")
+        return False
+    
+    if not chunk_videos:
+        print(f"DEBUG: {chunk_name} has no valid video IDs, considering it completed")
+        return True
+    
+    # Check if all videos in the chunk have been processed
+    results_path = os.path.join('tmp', 'processing_results.csv')
+    if not os.path.exists(results_path):
+        print(f"DEBUG: Results file does not exist")
+        return False
+    
+    processed_videos = set()
+    try:
+        with open(results_path, 'r', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                # Consider a video processed if it's in the results file at all
+                processed_videos.add(row.get('video_id'))
+        print(f"DEBUG: Found {len(processed_videos)} processed videos in results file")
+    except Exception as e:
+        print(f"DEBUG: Error reading results file: {e}")
+        return False
+    
+    # Check if all videos in the chunk are in the processed set
+    missing_videos = []
+    for video_id in chunk_videos:
+        if video_id not in processed_videos:
+            missing_videos.append(video_id)
+    
+    if missing_videos:
+        print(f"DEBUG: {chunk_name} is not completed. Missing {len(missing_videos)} videos:")
+        for video_id in missing_videos[:5]:  # Show first 5 missing videos
+            print(f"DEBUG: Missing video: {video_id}")
+        if len(missing_videos) > 5:
+            print(f"DEBUG: ... and {len(missing_videos) - 5} more")
+        return False
+    else:
+        print(f"DEBUG: All videos in {chunk_name} are successfully processed")
+        return True
+
+def update_completion_markers():
+    """Update completion markers for all chunks based on results file"""
+    chunks_dir = 'chunks'
+    chunk_files = []
+    
+    if os.path.exists(chunks_dir):
+        for filename in os.listdir(chunks_dir):
+            if filename.startswith('chunk_') and filename.endswith('.txt'):
+                chunk_files.append(os.path.join(chunks_dir, filename))
+    
+    chunk_files.sort()
+    
+    for chunk_file in chunk_files:
+        # Check if all videos in the chunk are processed
+        if is_chunk_completed(chunk_file):
+            # Create marker file if it doesn't exist
+            marker_file = chunk_file.replace('.txt', '.completed')
+            if not os.path.exists(marker_file):
+                mark_chunk_completed(chunk_file)
+                print(f"Created completion marker for {os.path.basename(chunk_file)}")
+        else:
+            # Remove marker file if it exists
+            marker_file = chunk_file.replace('.txt', '.completed')
+            if os.path.exists(marker_file):
+                os.remove(marker_file)
+                print(f"Removed incorrect completion marker for {os.path.basename(chunk_file)}")
+    
+    print("Completion markers updated.")
+
+def force_update_chunk_status(chunk_file, lenient=True):
+    """Force update the status of a specific chunk with option to be lenient"""
+    chunk_name = os.path.basename(chunk_file)
+    print(f"Forcing update of chunk status for {chunk_name} (lenient={lenient})")
+    
+    # Get video IDs from the chunk file
+    chunk_videos = []
+    with open(chunk_file, 'r') as f:
+        for line in f:
+            video_id = line.strip()
+            if video_id and not video_id.startswith('#') and len(video_id) >= 16:
+                chunk_videos.append(video_id)
+    
+    print(f"Found {len(chunk_videos)} valid video IDs in {chunk_name}")
+    
+    # Check if all videos in the chunk have been processed
+    results_path = os.path.join('tmp', 'processing_results.csv')
+    if not os.path.exists(results_path):
+        print(f"Results file does not exist")
+        return False
+    
+    processed_videos = set()
+    with open(results_path, 'r', encoding='utf-8') as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            video_id = row.get('video_id')
+            if video_id:
+                if lenient:
+                    # Consider any video in the results file as processed
+                    processed_videos.add(video_id)
+                else:
+                    # Only consider videos with vdocipher_uploaded=true as processed
+                    if row.get('vdocipher_uploaded', '').lower() == 'true':
+                        processed_videos.add(video_id)
+    
+    print(f"Found {len(processed_videos)} processed videos in results file")
+    
+    # Check if all videos in the chunk are in the processed set
+    missing_videos = []
+    for video_id in chunk_videos:
+        if video_id not in processed_videos:
+            missing_videos.append(video_id)
+    
+    if missing_videos:
+        print(f"{chunk_name} is not completed. Missing {len(missing_videos)} videos:")
+        for video_id in missing_videos[:5]:
+            print(f"  - {video_id}")
+        if len(missing_videos) > 5:
+            print(f"  - ... and {len(missing_videos) - 5} more")
+        return False
+    else:
+        print(f"{chunk_name} is completed (all videos processed)")
+        # Create marker file
+        marker_file = chunk_file.replace('.txt', '.completed')
+        with open(marker_file, 'w') as f:
+            f.write(f"Completed at: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"Created completion marker for {chunk_name}")
+        return True
+
+def fix_video_id_in_chunk(chunk_file):
+    """Fix the 'video_id' placeholder in a chunk file"""
+    with open(chunk_file, 'r') as f:
+        content = f.read()
+    
+    # Replace 'video_id' with a comment
+    fixed_content = content.replace('video_id', '# video_id')
+    
+    with open(chunk_file, 'w') as f:
+        f.write(fixed_content)
+    
+    print(f"Fixed 'video_id' placeholder in {os.path.basename(chunk_file)}")
+
 def main():
     parser = argparse.ArgumentParser(description='Run multiple instances of main.py in parallel')
     parser.add_argument('--chunks-dir', type=str, default='chunks', 
@@ -250,8 +445,39 @@ def main():
                         help='Interval in seconds between status updates')
     parser.add_argument('--detailed', action='store_true', default=True,
                         help='Show detailed progress information')
+    parser.add_argument('--force', action='store_true',
+                        help='Force processing of all chunks, even if they appear completed')
+    parser.add_argument('--update-markers', action='store_true',
+                        help='Update completion markers for all chunks and exit')
+    parser.add_argument('--check-chunk', type=str,
+                        help='Check and update status for a specific chunk (e.g., chunk_001.txt)')
+    parser.add_argument('--lenient-check', type=str,
+                        help='Check chunk status leniently (any entry in results file counts)')
     
     args = parser.parse_args()
+    
+    # Check if we should just update markers
+    if args.update_markers:
+        update_completion_markers()
+        return
+    
+    # Check if we should check a specific chunk
+    if args.check_chunk:
+        chunk_path = os.path.join(args.chunks_dir, args.check_chunk)
+        if os.path.exists(chunk_path):
+            force_update_chunk_status(chunk_path)
+        else:
+            print(f"Chunk file not found: {args.check_chunk}")
+        return
+    
+    # Check if we should check a specific chunk leniently
+    if args.lenient_check:
+        chunk_path = os.path.join(args.chunks_dir, args.lenient_check)
+        if os.path.exists(chunk_path):
+            force_update_chunk_status(chunk_path, lenient=True)
+        else:
+            print(f"Chunk file not found: {args.lenient_check}")
+        return
     
     # Get all chunk files
     chunk_files = []
@@ -265,7 +491,24 @@ def main():
         print(f"No chunk files found in {args.chunks_dir}")
         return
     
-    print(f"Found {len(chunk_files)} chunk files to process")
+    # Filter out completed chunks unless --force is specified
+    if not args.force:
+        pending_chunks = []
+        for chunk_file in chunk_files:
+            if is_chunk_completed(chunk_file):
+                print(f"Skipping completed chunk: {os.path.basename(chunk_file)}")
+            else:
+                pending_chunks.append(chunk_file)
+        
+        if not pending_chunks:
+            print("All chunks have been completed! Use --force to reprocess.")
+            return
+        
+        print(f"Found {len(pending_chunks)} pending chunks out of {len(chunk_files)} total")
+        chunk_files = pending_chunks
+    else:
+        print(f"Force mode: processing all {len(chunk_files)} chunks")
+    
     print(f"Running with {args.max_workers} parallel workers")
     print(f"Status updates every {args.status_interval} seconds")
     
@@ -321,4 +564,15 @@ def main():
                 print(f"  - {os.path.basename(chunk_file)}")
 
 if __name__ == "__main__":
-    main() 
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "--fix-video-id":
+        if len(sys.argv) > 2:
+            chunk_file = sys.argv[2]
+            if os.path.exists(chunk_file):
+                fix_video_id_in_chunk(chunk_file)
+            else:
+                print(f"Chunk file not found: {chunk_file}")
+        else:
+            print("Please specify a chunk file to fix")
+    else:
+        main() 

@@ -37,3 +37,6 @@ tmp/
 
 # Environment variables
 .env 
+
+# Chunkes
+chunks/*

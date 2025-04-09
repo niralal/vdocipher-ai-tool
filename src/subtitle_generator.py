@@ -10,6 +10,8 @@ from src.text_processor import TextProcessor
 import os
 import tempfile
 import csv
+import shutil
+import traceback
 
 class SubtitleGenerator:
     def __init__(self):
@@ -181,15 +183,16 @@ class SubtitleGenerator:
             # Handle Russian translation if enabled
             if self.config.ENABLE_RUSSIAN_TRANSLATION:
                 print("- Translating to Russian...")
-                russian_text = self.text_processor.translate_to_russian(original_text)
-                if russian_text:
-                    russian_path = os.path.join(self.tmp_dir, f"{video_id}_ru.srt")
-                    with open(russian_path, "w", encoding="utf-8") as file:
-                        file.write(russian_text)
-                    print("- Russian translation saved")
-                    status['russian'] = self.vdo_client.upload_subtitle(video_id, russian_path, "ru")
-                else:
-                    print("- Russian translation failed")
+                try:
+                    russian_path = self.text_processor.translate_to_russian(hebrew_path)
+                    status['russian'] = self.vdo_client.upload_subtitle(video_id, russian_path, 'ru')
+                except Exception as e:
+                    print(f"✗ Error translating to Russian: {str(e)}")
+                    print(f"DEBUG: Traceback: {traceback.format_exc()}")
+            else:
+                print("- Russian translation disabled in config")
+                # Mark as successful if disabled
+                status['russian'] = True
 
             # Upload Hebrew subtitles
             status['vdocipher'] = self.vdo_client.upload_subtitle(video_id, hebrew_path, "he")
@@ -216,8 +219,11 @@ class SubtitleGenerator:
             return False, status
 
     def _update_results_file(self, video_id, status):
-        """Update the results CSV file with the current video status"""
+        """Update the results CSV file with the current video status using a temporary file approach"""
+        import tempfile
+        
         results_path = os.path.join(self.tmp_dir, 'processing_results.csv')
+        print(f"DEBUG: Updating results file at {results_path}")
         
         # Create tmp directory if it doesn't exist
         os.makedirs(os.path.dirname(results_path), exist_ok=True)
@@ -226,14 +232,17 @@ class SubtitleGenerator:
         results = []
         try:
             if os.path.exists(results_path):
+                print(f"DEBUG: Reading existing results file")
                 with open(results_path, 'r', encoding='utf-8') as file:
                     reader = csv.DictReader(file)
                     for row in reader:
                         # Keep all rows that don't relate to the current video
                         if row.get('video_id') != video_id:
                             results.append(row)
+                print(f"DEBUG: Read {len(results)} existing records")
         except Exception as e:
             print(f"Warning: Error reading results file: {str(e)}")
+            print(f"DEBUG: Traceback: {traceback.format_exc()}")
         
         # Add the new result
         result = {
@@ -244,20 +253,35 @@ class SubtitleGenerator:
             'vdocipher_uploaded': str(status.get('vdocipher', False)).lower()
         }
         results.append(result)
+        print(f"DEBUG: Added new record for {video_id}")
         
-        # Write the file
+        # Write to a temporary file first, then rename
         try:
-            with open(results_path, 'w', newline='', encoding='utf-8') as file:
+            print(f"DEBUG: Creating temporary file")
+            fd, temp_path = tempfile.mkstemp(dir=self.tmp_dir, suffix='.csv')
+            os.close(fd)  # Close the file descriptor immediately
+            
+            print(f"DEBUG: Writing to temporary file {temp_path}")
+            with open(temp_path, 'w', newline='', encoding='utf-8') as file:
                 fieldnames = ['video_id', 'sent_to_baumann', 'ru_translated', 
                              'ar_translated', 'vdocipher_uploaded']
                 writer = csv.DictWriter(file, fieldnames=fieldnames)
                 writer.writeheader()
                 writer.writerows(results)
-                
-            # Flush buffer to disk
-            file.flush()
-            os.fsync(file.fileno())
+            
+            print(f"DEBUG: Renaming temporary file to {results_path}")
+            # On Windows, we need to remove the destination file first
+            if os.path.exists(results_path):
+                os.remove(results_path)
+            os.rename(temp_path, results_path)
             
             print(f"✓ Updated results file for video {video_id}")
         except Exception as e:
             print(f"✗ Error updating results file: {str(e)}")
+            print(f"DEBUG: Traceback: {traceback.format_exc()}")
+            # Clean up the temporary file if it exists
+            if 'temp_path' in locals() and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except:
+                    pass
